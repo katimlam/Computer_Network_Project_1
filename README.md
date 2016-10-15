@@ -1,3 +1,4 @@
+Ka Tim Lam, Wenhui Kuang
 # CS118 Project 1
 
 Template for for [CS118 Spring 2016 Project 1](http://web.cs.ucla.edu/classes/spring16/cs118/project-1.html) 
