@@ -9,12 +9,13 @@
 
 #include <iostream>
 #include <sstream>
+#include <string>
 using namespace std;
 
 int
 main(int argc, const char* argv[])
 {
-	std::string hostname, port, file_dir;
+	string hostname, port, file_dir;
 	
 	if(argc == 1){
 		hostname = "localhost";
@@ -22,12 +23,13 @@ main(int argc, const char* argv[])
 		file_dir = ".";
 	}
 	else if(argc == 4){
-		hostname = argv[1];
-		port = argv[2];
-		file_dir = argv[3];
+		hostname = string(stringargv[1]);
+		port = string(argv[2]);
+		file_dir = string(argv[3]);
 	}
 	else{
-		
+		cerr << "Invalid Argument" << endl;
+		exit(EXIT_FAILURE);
 	}
 	
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
