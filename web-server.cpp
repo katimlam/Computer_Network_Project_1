@@ -17,6 +17,8 @@ using namespace std;
 
 #define DEBUG 1;
 
+void new_connection(int clientSockfd);
+
 int
 main(int argc, const char* argv[])
 {
@@ -95,61 +97,53 @@ main(int argc, const char* argv[])
 		return 2;
 	}
 	
-	
 	// set socket to listen status
 	if (listen(sockfd, 64) == -1) {
 		perror("listen");
 		return 3;
 	}
 	
-	//////////////////////////////////////////////////////////////////////////////////
 	// accept a new connection
 	while(1){
+		struct sockaddr_in clientAddr;
+		socklen_t clientAddrSize = sizeof(clientAddr);
+		int clientSockfd = accept(sockfd, (struct sockaddr*)&clientAddr, &clientAddrSize);
+
+		if (clientSockfd == -1) {
+			perror("accept");
+			return 4;
+		}
 		
+		thread(new_connection, clientSockfd).detach();
 	}
-	struct sockaddr_in clientAddr;
-	socklen_t clientAddrSize = sizeof(clientAddr);
-	int clientSockfd = accept(sockfd, (struct sockaddr*)&clientAddr, &clientAddrSize);
+	
+	return 0;
+}
 
-	if (clientSockfd == -1) {
-		perror("accept");
-		return 4;
+void new_connection(int clientSockfd){
+	char ipstr[INET_ADDRSTRLEN] = {'\0'};
+	inet_ntop(clientAddr.sin_family, &clientAddr.sin_addr, ipstr, sizeof(ipstr));
+	if(DEBUG){
+		std::cout << "Accept a connection from: " << ipstr << ":" << ntohs(clientAddr.sin_port) << std::endl;
 	}
 
-  char ipstr[INET_ADDRSTRLEN] = {'\0'};
-  inet_ntop(clientAddr.sin_family, &clientAddr.sin_addr, ipstr, sizeof(ipstr));
-  std::cout << "Accept a connection from: " << ipstr << ":" <<
-    ntohs(clientAddr.sin_port) << std::endl;
+	// read/write data from the connection
+	bool isEnd = false;
+	char buf[1024] = {0};
+	std::stringstream ss;
 
-  // read/write data from/into the connection
-  bool isEnd = false;
-  char buf[20] = {0};
-  std::stringstream ss;
+	while (!isEnd) {
+		memset(buf, '\0', sizeof(buf));
 
-  while (!isEnd) {
-    memset(buf, '\0', sizeof(buf));
+		if (recv(clientSockfd, buf, 20, 0) == -1) {
+			perror("recv");
+			return 5;
+		}
 
-    if (recv(clientSockfd, buf, 20, 0) == -1) {
-      perror("recv");
-      return 5;
-    }
-
-    ss << buf << std::endl;
-    std::cout << buf << std::endl;
-
-
-    if (send(clientSockfd, buf, 20, 0) == -1) {
-      perror("send");
-      return 6;
-    }
-
-    if (ss.str() == "close\n")
-      break;
-
-    ss.str("");
-  }
-
-  close(clientSockfd);
-
-  return 0;
+		ss << buf << std::endl;
+		if(DEBUG){
+			std::cout << buf << std::endl;
+		}
+	}
+	close(clientSockfd);
 }
