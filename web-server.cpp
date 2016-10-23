@@ -1,4 +1,14 @@
-#include "HttpMessage.h"
+//
+//  web-server.cpp
+//  hhh
+//
+//  Created by wenhui kuang on 10/15/16.
+//  Copyright (c) 2016 wenhui kuang. All rights reserved.
+//
+
+
+#include "HttpRequest.h"
+#include "HttpRespone.h"
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -124,22 +134,58 @@ void new_connection(int clientSockfd){
     
     
     // read/write data from the connection
-    bool isEnd = false;
+    //bool isEnd = false;
     char buf[1024] = {0};
     std::stringstream ss;
     
-    while (!isEnd) {
-        memset(buf, '\0', sizeof(buf));
-        
+    memset(buf, '\0', sizeof(buf));
+    
+    while (1) {
         if (recv(clientSockfd, buf, sizeof(buf), 0) == -1) {
             perror("recv");
             exit(1);
         }
-        
-        ss << buf << std::endl;
-        if(DEBUG){
-            std::cout << buf << std::endl;
+        ss << buf;
+        memset(buf, '\0', sizeof(buf));
+        string temp = ss.str();
+        size_t pos = temp.find("\r\n\r\n");
+        if (pos != string::npos) {
+            break;
         }
+    }
+    
+    if(DEBUG){
+        std::cout << &ss << std::endl;
+    }
+    
+    HttpRequest request;
+    HttpResponse response;
+    request.comsume(ss.str());
+    
+    if(DEBUG){
+        //        cout << request.getHost() << endl;
+        cout << request.getMethod() << endl;
+        cout << request.getpath() << endl;
+        cout << request.getVersion() << endl;
+    }
+    if (request.getMethod() != "GET" || request.getHost() != "Host:") {
+        response.setStatus("400");
+        response.setVersion(request.getVersion());
+        string to_client = response.encode();
+        write(clientSockfd, to_client.c_str(), to_client.length());
+    }
+    else if (request.getVersion() != "HTTP/1.0") {
+        response.setStatus("505");
+        response.setVersion(request.getVersion());
+        string to_client = response.encode();
+        write(clientSockfd, to_client.c_str(), to_client.length());
+    }
+    else
+    {
+        response.setStatus("200");
+        response.setVersion(request.getVersion());
+        string to_client = response.encode();
+        write(clientSockfd, to_client.c_str(), to_client.length());
     }
     close(clientSockfd);
 }
