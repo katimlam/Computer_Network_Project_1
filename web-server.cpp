@@ -9,6 +9,7 @@
 
 #include "HttpRequest.h"
 #include "HttpRespone.h"
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -19,16 +20,18 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <thread>
+#include <fstream>
 using namespace std;
 
-#define DEBUG 1
+#define DEBUG 0
 
-void new_connection(int clientSockfd);
+void new_connection(int clientSockfd,string file_dir);
 
 int
 main(int argc, const char* argv[])
@@ -45,6 +48,7 @@ main(int argc, const char* argv[])
         hostname = argv[1];
         port = argv[2];
         file_dir = argv[3];
+        file_dir = file_dir.substr(1);
     }
     else{
         std::cerr << "Invalid Argument" << endl;
@@ -67,7 +71,7 @@ main(int argc, const char* argv[])
         return 1;
     }
     
-    std::cout << "IP addresses for " << argv[1] << ": " << std::endl;
+    //std::cout << "IP addresses for " << argv[1] << ": " << std::endl;
     char ipstr[INET_ADDRSTRLEN] = {'\0'};
     for(struct addrinfo* p = res; p != 0; p = p->ai_next) {
         // convert address to IPv4 address
@@ -124,13 +128,13 @@ main(int argc, const char* argv[])
             std::cout << "Accept a connection from: " << ipstr << ":" << ntohs(clientAddr.sin_port) << std::endl;
         }
         
-        thread(new_connection, clientSockfd).detach();
+        thread(new_connection, clientSockfd,file_dir).detach();
     }
     
     return 0;
 }
 
-void new_connection(int clientSockfd){
+void new_connection(int clientSockfd,string file_dir){
     
     
     // read/write data from the connection
@@ -161,31 +165,106 @@ void new_connection(int clientSockfd){
     HttpRequest request;
     HttpResponse response;
     request.comsume(ss.str());
+    size_t pos = ss.str().find("Host:");
     
     if(DEBUG){
-        //        cout << request.getHost() << endl;
+        cout << request.getHost() << endl;
         cout << request.getMethod() << endl;
         cout << request.getpath() << endl;
         cout << request.getVersion() << endl;
     }
-    if (request.getMethod() != "GET" || request.getHost() != "Host:") {
+    if (request.getMethod() != "GET" || pos == string::npos) {
         response.setStatus("400");
         response.setVersion(request.getVersion());
         string to_client = response.encode();
-        write(clientSockfd, to_client.c_str(), to_client.length());
+        if(write(clientSockfd,to_client.c_str(),to_client.length()) < 0){
+            cout << "Error writing to socket" <<"\n";
+            close(clientSockfd);
+            return;
+        }
     }
-    else if (request.getVersion() != "HTTP/1.0") {
-        response.setStatus("505");
-        response.setVersion(request.getVersion());
-        string to_client = response.encode();
-        write(clientSockfd, to_client.c_str(), to_client.length());
-    }
+//    else if (request.getVersion() != "HTTP/1.0") {
+//        response.setStatus("505");
+//        response.setVersion(request.getVersion());
+//        string to_client = response.encode();
+//        if(write(clientSockfd,to_client.c_str(),to_client.length()) < 0){
+//            cout << "Error writing to socket" <<"\n";
+//            close(clientSockfd);
+//            return;
+//        }
+//    }
     else
     {
         response.setStatus("200");
         response.setVersion(request.getVersion());
+        
+        string filePath = file_dir + request.getpath();
+        cout << "Receiving a file from: " << filePath << endl;
+        //string to_client = response.encode();
+        //open file
+        char buffer1[1024*1024];
+        long readBytes = 0;
+        int fd = open(filePath.c_str(), O_RDONLY);
+        struct stat st;
+        stat(filePath.c_str(), &st);
+        long long size = st.st_size;
+        
+        response.setLength(to_string(size));
         string to_client = response.encode();
-        write(clientSockfd, to_client.c_str(), to_client.length());
+        
+        if (fd >= 0) {
+            if(write(clientSockfd,to_client.c_str(),to_client.length()) < 0){
+                cout << "Error writing to socket" <<"\n";
+                close(clientSockfd);
+                return;
+            }
+            while((readBytes = read(fd, buffer1, sizeof(buffer1))) != 0){
+                if(write(clientSockfd, buffer1, readBytes) < 0){
+                    cout << "Error writing to socket" <<"\n";
+                    close(clientSockfd);
+                    return;
+                }
+                memset(&buffer1, 0, sizeof(buffer1));
+                
+            }
+            
+        }
+        //        int fileSize = 0;
+        //        string line;
+        //        ifstream myfile(filePath);
+        //        if (myfile.is_open()) {
+        //            cout << "haha";
+        //            if(write(clientSockfd,to_client.c_str(),to_client.length()) < 0){
+        //                cout << "Error writing to socket" <<"\n";
+        //                close(clientSockfd);
+        //                return;
+        //            }
+        //            while (getline(myfile,line)) {
+        //                line += line;
+        //                cout << "haha";
+        //                fileSize++;
+        //            }
+        //
+        //            if(write(clientSockfd,line.c_str(),fileSize) < 0){
+        //                cout << "Error writing to socket" <<"\n";
+        //            }
+        //            myfile.close();
+        //        }
+        
+        else
+        {
+            response.setStatus("404");
+            cout << fd << endl;
+            string to_client = response.encode();
+            if(write(clientSockfd,to_client.c_str(),to_client.length()) < 0){
+                cout << "Error writing to socket.." <<"\n";
+                close(clientSockfd);
+                return;
+            }
+            
+        }
+        
     }
+    
     close(clientSockfd);
 }

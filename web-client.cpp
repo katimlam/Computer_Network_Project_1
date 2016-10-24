@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <fstream>
+#include <fcntl.h>
 
 using namespace std;
 
@@ -179,7 +180,7 @@ int main(int argc, char *argv[])
             }
             
         }
-        cout << reply << endl;
+        cout << reply;
         
         HttpResponse response;
         response.comsume(reply);
@@ -206,18 +207,27 @@ int main(int argc, char *argv[])
             close(sockfd);
             exit(1);
         }
+        int fd1 = open(filename.c_str(),O_CREAT | O_WRONLY | O_TRUNC, 0644);
+        if (fd1 == -1)
+        {
+            cout << "Cannot create file." << endl;
+            perror("Error: \n");
+            exit(2);
+        }
         
-        fstream file;
-        file.open(filename,ios::out|ios::binary);
         while ((read = recv(sockfd, &buffer, sizeof(buffer), 0)) > 0) {
-            file.write(buffer, read);
-            file.flush();
+            cout << buffer;
+            if(write(fd1,buffer,sizeof(buffer)) < 0){
+                cout << "Error writing to file" <<"\n";
+                close(sockfd);
+                exit(1);
+            }
             memset(buffer, 0, sizeof(buffer));
         }
-        file.close();
+        
         close(sockfd);
     }
-
+    
     
 }
 

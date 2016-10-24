@@ -17,7 +17,7 @@ class HttpResponse : public HttpMessage
 private:
     HttpMethod m_method;
     string contentLength;
-    //string contentType;
+    string contentType;
     string status;
 public:
     HttpResponse();
@@ -28,6 +28,8 @@ public:
     HttpMethod getMethod(){return m_method;};
     string getStatus(){return status;};
     void setStatus(string m_status){status = m_status;};
+    void setLength(string Length){contentLength = Length;};
+    void setType(string type){contentType = type;};
     
 };
 
@@ -62,11 +64,7 @@ string HttpResponse::encode()
         response += getStatus() + " HTTP version not supported\r\n";
     }
     response += "Connection: close\r\n";
-    if (contentLength != "0") {
-        response += "Content-Length:" + contentLength + "\r\n" + "Content-Type: html";
-    }
-    else
-        response += "Content-Type: html\r\n";
+    response += "Content-Length:" + contentLength + "\r\n" + "Content-Type: html\r\n\r\n";
     return response;
 }
 
